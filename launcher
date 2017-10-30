@@ -1,0 +1,44 @@
+#!/usr/bin/ruby
+require 'json'
+require 'fileutils'
+
+def start remark
+  stop
+  configs = JSON.parse(File.open('./gui-config.json', &:read))['configs']
+  config = configs.find{|x| x["remarks"] == remark}
+  temp_config = File.open('./temp_config.json', 'w'){|f| f.write config.to_json}
+
+  exit if fork
+  Process.setsid
+  exit if fork
+
+  #STDIN.reopen '/dev/null'
+  #STDOUT.reopen '/dev/null', 'a'
+  #STDERR.reopen '/dev/null', 'a'
+
+  pid = Process.spawn("ss-local -s #{config['server']} -p #{config['server_port']} -l 1080 -k #{config['password']} -m #{config['method']} -c temp_config.json")
+  File.open('./pid', 'w'){|f| f.write pid}
+  sleep 0.5
+  FileUtils.rm('./temp_config.json')
+end
+
+def stop
+  pid = File.open('./pid', &:read) rescue nil
+  if pid && Dir.exists?("/proc/#{pid}")
+    status = `cat /proc/#{pid}/status`
+    if status.lines.first.match(/ss-local/)
+      Process.kill('INT', pid.to_i)
+    end
+  end
+end
+
+case ARGV[0]
+when nil
+  puts "Usage:"
+  puts "./launcher start REMARKS"
+  puts "./launcher stop"
+when 'start'
+  start ARGV[1]
+when 'stop'
+  stop
+end
