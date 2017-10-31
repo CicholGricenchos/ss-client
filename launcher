@@ -4,9 +4,10 @@ require 'fileutils'
 
 def start remark
   stop
-  configs = JSON.parse(File.open('./gui-config.json', &:read))['configs']
+  configs = JSON.parse(File.open("#{__dir__}/gui-config.json", &:read))['configs']
   config = configs.find{|x| x["remarks"] == remark}
-  temp_config = File.open('./temp_config.json', 'w'){|f| f.write config.to_json}
+  temp_config_path = "#{__dir__}/temp_config.json"
+  temp_config = File.open(temp_config_path, 'w'){|f| f.write config.to_json}
 
   exit if fork
   Process.setsid
@@ -16,14 +17,14 @@ def start remark
   #STDOUT.reopen '/dev/null', 'a'
   #STDERR.reopen '/dev/null', 'a'
 
-  pid = Process.spawn("ss-local -s #{config['server']} -p #{config['server_port']} -l 1080 -k #{config['password']} -m #{config['method']} -c temp_config.json")
-  File.open('./pid', 'w'){|f| f.write pid}
+  pid = Process.spawn("ss-local -s #{config['server']} -p #{config['server_port']} -l 1080 -k #{config['password']} -m #{config['method']} -c #{temp_config_path}")
+  File.open("#{__dir__}/pid", 'w'){|f| f.write pid}
   sleep 0.5
-  FileUtils.rm('./temp_config.json')
+  FileUtils.rm(temp_config_path)
 end
 
 def stop
-  pid = File.open('./pid', &:read) rescue nil
+  pid = File.open("#{__dir__}/pid", &:read) rescue nil
   if pid && Dir.exists?("/proc/#{pid}")
     status = `cat /proc/#{pid}/status`
     if status.lines.first.match(/ss-local/)
